@@ -100,6 +100,7 @@ modules.order
 /include/generated/
 /include/ksym/
 /arch/*/include/generated/
+/user_headers/
 
 # stgit generated dirs
 patches-*
