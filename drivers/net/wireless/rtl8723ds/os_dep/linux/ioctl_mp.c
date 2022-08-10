@@ -153,8 +153,8 @@ int rtw_mp_read_reg(struct net_device *dev,
 	char *pextra = extra;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (wrqu->length > 128)
 		return -EFAULT;
 
@@ -283,7 +283,7 @@ int rtw_mp_write_rf(struct net_device *dev,
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
+
 	_rtw_memset(input, 0, wrqu->length);
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -334,7 +334,7 @@ int rtw_mp_read_rf(struct net_device *dev,
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
+
 	if (wrqu->length > 128)
 		return -EFAULT;
 	_rtw_memset(input, 0, wrqu->length);
@@ -446,15 +446,15 @@ int rtw_mp_rate(struct net_device *dev,
 {
 	u32 rate = MPT_RATE_1M;
 	u8 err = 0;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	PMPT_CONTEXT		pMptCtx = &(padapter->mppriv.mpt_ctx);
 	struct hal_spec_t *hal_spec = GET_HAL_SPEC(padapter);
 	struct	mp_priv	*pmppriv = &padapter->mppriv;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -518,12 +518,13 @@ int rtw_mp_channel(struct net_device *dev,
 
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(padapter);
-	u8		input[RTW_IWD_MAX_LEN];
-	u32	channel = 1;
+	u8 input[RTW_IWD_MAX_LEN];
+	u8	channel = 1;
+	struct	mp_priv	*pmppriv = &padapter->mppriv;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -535,6 +536,7 @@ int rtw_mp_channel(struct net_device *dev,
 	sprintf(extra, "Change channel %d to channel %d", padapter->mppriv.channel , channel);
 	padapter->mppriv.channel = channel;
 	rtw_hal_set_hwreg(padapter, HW_VAR_CHECK_TXBUF, 0);
+	rtw_adjust_chbw(padapter, channel, &pmppriv->bandwidth, &pmppriv->prime_channel_offset);
 	SetChannel(padapter);
 	pHalData->current_channel = channel;
 
@@ -549,13 +551,13 @@ int rtw_mp_ch_offset(struct net_device *dev,
 {
 
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	u32	ch_offset = 0;
 	char *pch;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
 		return -EFAULT;
-	
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -578,27 +580,22 @@ int rtw_mp_bandwidth(struct net_device *dev,
 		     struct iw_request_info *info,
 		     struct iw_point *wrqu, char *extra)
 {
-	u32 bandwidth = 0, sg = 0;
+	u8 bandwidth = 0, sg = 0;
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(padapter);
-	u8		input[RTW_IWD_MAX_LEN];
-
+	struct	mp_priv	*pmppriv = &padapter->mppriv;
+	u8 input[RTW_IWD_MAX_LEN];
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
-	if (sscanf(input, "40M=%d,shortGI=%d", &bandwidth, &sg) > 0)
-		RTW_INFO("%s: bw=%d sg=%d\n", __func__, bandwidth , sg);
+	if (sscanf(input, "40M=%hhd,shortGI=%hhd", &bandwidth, &sg) > 0)
+		RTW_INFO("%s: bw=%hhd sg=%hhd\n", __func__, bandwidth , sg);
 
-	if (bandwidth == 1 && hal_chk_bw_cap(padapter, BW_CAP_40M))
-		bandwidth = CHANNEL_WIDTH_40;
-	else if (bandwidth == 2 && hal_chk_bw_cap(padapter, BW_CAP_80M))
-		bandwidth = CHANNEL_WIDTH_80;
-	else
-		bandwidth = CHANNEL_WIDTH_20;
+	rtw_adjust_chbw(padapter, pmppriv->channel, &bandwidth, &pmppriv->prime_channel_offset);
 
 	padapter->mppriv.bandwidth = (u8)bandwidth;
 	padapter->mppriv.preamble = sg;
@@ -627,7 +624,7 @@ int rtw_mp_txpower_index(struct net_device *dev,
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
 		return -EFAULT;
-	
+
 	if (wrqu->length > 128)
 		return -EFAULT;
 
@@ -696,15 +693,15 @@ int rtw_mp_txpower(struct net_device *dev,
 {
 	u32 idx_a = 0, idx_b = 0, idx_c = 0, idx_d = 0;
 	int MsetPower = 1;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	u8 res = 0;
 
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	PMPT_CONTEXT		pMptCtx = &(padapter->mppriv.mpt_ctx);
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -747,14 +744,14 @@ int rtw_mp_ant_tx(struct net_device *dev,
 		  struct iw_point *wrqu, char *extra)
 {
 	u8 i;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	u16 antenna = 0;
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -804,14 +801,13 @@ int rtw_mp_ant_rx(struct net_device *dev,
 {
 	u8 i;
 	u16 antenna = 0;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
 		return -EFAULT;
-	
-	
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -1043,7 +1039,7 @@ int rtw_mp_disable_bt_coexist(struct net_device *dev,
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->data.length + 1)))
 		return -EFAULT;
-	
+
 	_rtw_memset(input, 0, sizeof(input));
 
 	if (copy_from_user(input, wrqu->data.pointer, wrqu->data.length))
@@ -1079,7 +1075,7 @@ int rtw_mp_arx(struct net_device *dev,
 {
 	int bStartRx = 0, bStopRx = 0, bQueryPhy = 0, bQueryMac = 0, bSetBssid = 0, bSetRxframe = 0;
 	int bmac_filter = 0, bmon = 0, bSmpCfg = 0;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	char *pch, *token, *tmp[2] = {0x00, 0x00};
 	u32 i = 0, jj = 0, kk = 0, cnts = 0, ret;
 	PADAPTER padapter = rtw_netdev_priv(dev);
@@ -1088,8 +1084,7 @@ int rtw_mp_arx(struct net_device *dev,
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
-	
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1273,11 +1268,11 @@ int rtw_mp_pwrtrk(struct net_device *dev,
 	u32 thermal;
 	s32 ret;
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1314,11 +1309,11 @@ int rtw_mp_psd(struct net_device *dev,
 	       struct iw_point *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
@@ -1389,6 +1384,9 @@ int rtw_mp_thermal(struct net_device *dev,
 	ther_path_addr[1] = EEPROM_THERMAL_METER_B_8814B;
 	ther_path_addr[2] = EEPROM_THERMAL_METER_C_8814B;
 	ther_path_addr[3] = EEPROM_THERMAL_METER_D_8814B;
+#endif
+#ifdef CONFIG_RTL8723F
+	ther_path_addr[0] = EEPROM_THERMAL_METER_8723F;
 #endif
 
 	if (copy_from_user(extra, wrqu->pointer, wrqu->length))
@@ -1476,15 +1474,14 @@ int rtw_mp_dump(struct net_device *dev,
 		struct iw_point *wrqu, char *extra)
 {
 	struct mp_priv *pmp_priv;
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	PADAPTER padapter = rtw_netdev_priv(dev);
 
 	pmp_priv = &padapter->mppriv;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
-	
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1504,13 +1501,13 @@ int rtw_mp_phypara(struct net_device *dev,
 
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(padapter);
-	char	input[RTW_IWD_MAX_LEN];
+	char input[RTW_IWD_MAX_LEN];
 	u32		invalxcap = 0, ret = 0, bwrite_xcap = 0, hwxtaladdr = 0;
 	u16		pgval;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1561,7 +1558,7 @@ int rtw_mp_SetRFPath(struct net_device *dev,
 		     struct iw_point *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	char	input[RTW_IWD_MAX_LEN];
+	char input[RTW_IWD_MAX_LEN];
 	int		bMain = 1, bTurnoff = 1;
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	u8 ret = _TRUE;
@@ -1615,14 +1612,14 @@ int rtw_mp_switch_rf_path(struct net_device *dev,
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	struct mp_priv *pmp_priv;
-	char	input[RTW_IWD_MAX_LEN];
+	char input[RTW_IWD_MAX_LEN];
 	char *pch;
 	int		bwlg = 1, bwla = 1, btg = 1, bbt=1;
 	u8 ret = 0;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
 		return -EFAULT;
-	
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1666,14 +1663,14 @@ int rtw_mp_QueryDrv(struct net_device *dev,
 		    union iwreq_data *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	char	input[RTW_IWD_MAX_LEN];
+	char input[RTW_IWD_MAX_LEN];
 	int	qAutoLoad = 1;
 
 	PHAL_DATA_TYPE pHalData = GET_HAL_DATA(padapter);
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->data.length))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->data.pointer, wrqu->data.length))
 		return -EFAULT;
 	RTW_INFO("%s:iwpriv in=%s\n", __func__, input);
@@ -1698,14 +1695,14 @@ int rtw_mp_PwrCtlDM(struct net_device *dev,
 		    struct iw_point *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	u8		input[RTW_IWD_MAX_LEN];
+	u8 input[RTW_IWD_MAX_LEN];
 	u8		pwrtrk_state = 0;
 	u8		pwtk_type[5][25] = {"Thermal tracking off","Thermal tracking on",
 					"TSSI tracking off","TSSI tracking on","TSSI calibration"};
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;					
-					
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -1845,36 +1842,87 @@ int rtw_mp_get_tsside(struct net_device *dev,
 	u8 rfpath;
 	u32 tssi_de;
 
+	u8 legal_param_num = 1;
+	int param_num;
+	char pout_str_buf[7];
+	u8 signed_flag = 0;
+	int integer_num;
+	u32 decimal_num;
+	s32 pout;
+	char *pextra;
+	int i;
+
+	#ifdef CONFIG_RTL8723F
+	/*
+	* rtwpriv wlan0 mp_get_tsside rf_path pout
+	* rf_path : 0 ~ 1
+	* pout : -15.000 ~ 25.000
+	* ex : rtwpriv wlan0 mp_get_tsside 0 -12.123
+	*/
+	legal_param_num = 2;
+	#endif
 	if (wrqu->length > 128)
 		return -EFAULT;
-	
-	if (rtw_do_mp_iwdata_len_chk(__func__, (wrqu->length + 1)))
-		return -EFAULT;
-	
+
 	_rtw_memset(input, 0, sizeof(input));
 
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
-	input[wrqu->length] = '\0';
+	param_num = sscanf(input, "%hhu %7s", &rfpath, pout_str_buf);
 
-	if (wrqu->length == 2) {
-		rfpath = rtw_atoi(input);
-		if (rfpath >= 0 && rfpath <= 3) {
-			tssi_de = halrf_tssi_get_de(pDM_Odm, rfpath);
-			if (rfpath == 0)
-				sprintf(extra, "patha=%d", tssi_de);
-			else if (rfpath == 1)
-				sprintf(extra, "pathb=%d", tssi_de);
-			else if (rfpath == 2)
-				sprintf(extra, "pathc=%d", tssi_de);
-			else if (rfpath == 3)
-				sprintf(extra, "pathd=%d", tssi_de);
-		} else
-			sprintf(extra, "Invalid command format, please indicate RF path 0/1/2/3");
-	} else
-		sprintf(extra, "Invalid command format, please indicate RF path 0/1/2/3");
+	/* Check parameter format*/
+	if(param_num != legal_param_num)
+		goto invalid_param_format;
 
+	if(rfpath <0 || 3 < rfpath)
+		goto invalid_param_format;
+
+#ifdef CONFIG_RTL8723F
+	/* Convert pout from floating-point to integer
+	 * For Floating-Point Precision, pout*1000
+	 */
+	if(pout_str_buf[0] == '-')
+		signed_flag = 1;
+	i = sscanf(pout_str_buf, "%d.%3u", &integer_num, &decimal_num);
+	pout = integer_num * 1000;
+	if(i == 2) {
+		/* Convert decimal number
+		 * ex : 0.1 => 100, -0.1 => 100
+		 */
+		decimal_num = (decimal_num < 10) ? decimal_num * 100 : decimal_num;
+		decimal_num = (decimal_num < 100) ? decimal_num * 10 : decimal_num;
+		pout += ((pout < 0 || signed_flag == 1) ? -decimal_num : decimal_num);
+	}
+	if(pout < -15000 || 25000 < pout)
+		goto invalid_param_format;
+#endif
+
+#ifdef CONFIG_RTL8723F
+	/* For Floating-Point Precision, pout */
+	tssi_de = halrf_get_online_tssi_de(pDM_Odm, rfpath, pout);
+#else
+	tssi_de = halrf_tssi_get_de(pDM_Odm, rfpath);
+#endif
+
+	if (rfpath == 0)
+		sprintf(extra, "patha=%d hex=%02x", tssi_de, (u8)tssi_de);
+	else if (rfpath == 1)
+		sprintf(extra, "pathb=%d hex=%02x", tssi_de, (u8)tssi_de);
+	else if (rfpath == 2)
+		sprintf(extra, "pathc=%d hex=%02x", tssi_de, (u8)tssi_de);
+	else if (rfpath == 3)
+		sprintf(extra, "pathd=%d hex=%02x", tssi_de, (u8)tssi_de);
+
+	wrqu->length = strlen(extra);
+	return 0;
+
+invalid_param_format:
+	sprintf(extra, "Invalid command format, please indicate RF path 0/1/2/3");
+#ifdef CONFIG_RTL8723F
+	pextra = extra + strlen(extra);
+	sprintf(pextra, " and pout value : -15.000 ~ 25.000\n");
+#endif
 	wrqu->length = strlen(extra);
 
 	return 0;
@@ -1892,8 +1940,8 @@ int rtw_mp_set_tsside(struct net_device *dev,
 	struct dm_struct		*pDM_Odm = &pHalData->odmpriv;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
@@ -2540,7 +2588,8 @@ int rtw_mp_hwtx(struct net_device *dev,
 	PMPT_CONTEXT		pMptCtx = &(padapter->mppriv.mpt_ctx);
 	char *pch;
 
-#if defined(CONFIG_RTL8814A) || defined(CONFIG_RTL8821B) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822C)
+#if defined(CONFIG_RTL8814A) || defined(CONFIG_RTL8821B) || defined(CONFIG_RTL8822B) \
+	|| defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822C) || defined(CONFIG_RTL8723F)
 	if (copy_from_user(extra, wrqu->data.pointer, wrqu->data.length))
 		return -EFAULT;
 	*(extra + wrqu->data.length) = '\0';
@@ -2954,7 +3003,7 @@ int rtw_mp_link(struct net_device *dev,
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	struct mp_priv *pmp_priv;
-	char	input[RTW_IWD_MAX_LEN];
+	char input[RTW_IWD_MAX_LEN];
 	int		bgetrxdata = 0, btxdata = 0, bsetbt = 0;
 	u8 err = 0;
 	u32 i = 0, datalen = 0,jj, kk, waittime = 0;
@@ -2966,9 +3015,8 @@ int rtw_mp_link(struct net_device *dev,
 	pmp_priv = &padapter->mppriv;
 
 	if (rtw_do_mp_iwdata_len_chk(__func__, wrqu->length))
-		return -EFAULT;	
-	
-	
+		return -EFAULT;
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 

@@ -51,7 +51,6 @@ struct rtw_proc_hdl {
 #define rtw_proc_ops file_operations
 #endif
 
-
 #ifdef CONFIG_PROC_DEBUG
 
 int rtw_drv_proc_init(void);
