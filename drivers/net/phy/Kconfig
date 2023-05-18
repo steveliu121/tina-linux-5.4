@@ -473,6 +473,11 @@ config RTL8363_NB
 	---help---
 	  This is a driver for the Fast Ethernet PCI network cards
 
+config JL51XX
+	tristate "JLSemi JL51xx Ethernet Adapter support"
+	---help---
+	  This is a driver for the JL51xx Fast Ethernet switch
+
 config SMSC_PHY
 	tristate "SMSC PHYs"
 	---help---

@@ -46,6 +46,10 @@
 #include <rtk_switch.h>
 #include <rtk_error.h>
 #include <rtl8367c_asicdrv_port.h>
+#elif defined CONFIG_JL51XX
+#include "jl_base.h"
+#include "port.h"
+#include "mib.h"
 #endif
 
 #define SUNXI_GMAC_VERSION "1.0.0"
@@ -175,9 +179,13 @@ struct geth_priv {
 rtk_port_mac_ability_t mac_cfg;
 rtk_stat_counter_t cntr;
 rtk_mode_ext_t mode;
+#endif
+
+#if (defined CONFIG_RTL8363_NB) || (defined CONFIG_JL51XX)
 struct net_device *ndev = NULL;
 struct geth_priv *priv;
 #endif
+
 static u64 geth_dma_mask = DMA_BIT_MASK(32);
 
 void sunxi_udelay(int n)
@@ -754,6 +762,55 @@ static int rtk_phy_write(struct mii_bus *bus, int phyaddr,
 }
 #endif
 
+#ifdef CONFIG_JL51XX
+/* jl51xx_vb switch init. */
+static int jl51xx_vb_init(void)
+{
+	jl_port_ext_mac_ability_t ability;
+
+	pr_info("%s->%d jl51xx init=====\n", __func__, __LINE__);
+
+	if (jl_switch_init() != JL_ERR_OK) {
+		pr_info("jlsemi switch init failed!\n");
+		return -1;
+	}
+
+	/* Force the MAC of EXT_PORT 1 working with 100F */
+	/* and Symmetric PAUSE flow control abilities */
+	memset(&ability, 0x00, sizeof(jl_port_ext_mac_ability_t));
+	jl_port_mac_force_link_ext_get(EXT_PORT0, &ability);
+	ability.force_mode = 1;
+	ability.speed = 1;
+	ability.duplex = 1;
+	ability.link = 1;
+	ability.tx_pause = 1;
+	ability.rx_pause = 1;
+	jl_port_mac_force_link_ext_set(EXT_PORT0, &ability);
+
+	jl_port_phy_all_enable_set(ENABLED);
+	return 0;
+}
+
+/* jl51xx switch mdc/mdio interface operations */
+int jl_mdio_read(u32 len, u8 phy_adr, u8 reg, u32 *value)
+{
+
+	struct geth_priv *priv = netdev_priv(ndev);
+	*value = sunxi_mdio_read(priv->base, 0, reg);
+
+	return 0;
+}
+
+int jl_mdio_write(u32 len, u8 phy_adr, u8 reg, u32 data)
+{
+
+	struct geth_priv *priv = netdev_priv(ndev);
+	sunxi_mdio_write(priv->base, 0, reg, data);
+
+	return 0;
+}
+#endif
+
 /* PHY interface operations */
 static int geth_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 {
@@ -787,17 +844,17 @@ static void geth_adjust_link(struct net_device *ndev)
 	struct geth_priv *priv = netdev_priv(ndev);
 	struct phy_device *phydev = ndev->phydev;
 	unsigned long flags;
-	int new_state = 0;
 	if (!phydev)
 		return;
 
 	spin_lock_irqsave(&priv->lock, flags);
-#ifdef CONFIG_RTL8363_NB
+#if (defined CONFIG_RTL8363_NB) || (defined CONFIG_JL51XX)
 	priv->speed = 1000;
 	priv->duplex = 1;
 	sunxi_set_link_mode(priv->base, 1, 1000);
 	phy_print_status(phydev);
 #else
+	int new_state = 0;
 	if (phydev->link) {
 		/* Now we make sure that we can be in full duplex mode.
 		 * If not, we operate in half-duplex mode.
@@ -1515,10 +1572,12 @@ static int geth_open(struct net_device *ndev)
 	}
 
 	ret = sunxi_mac_reset((void *)priv->base, &sunxi_udelay, 10000);
+#if 0
 	if (ret) {
 		netdev_err(ndev, "Initialize hardware error\n");
 		goto desc_err;
 	}
+#endif
 
 	sunxi_mac_init(priv->base, txmode, rxmode);
 	sunxi_set_umac(priv->base, ndev->dev_addr, 0);
@@ -2329,7 +2388,7 @@ static void geth_hw_release(struct platform_device *pdev)
 static int geth_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-#ifdef CONFIG_RTL8363_NB
+#if defined(CONFIG_RTL8363_NB)||defined(CONFIG_JL51XX)
 	//use net_device and geth_priv as global variable.
 #else
 	struct net_device *ndev = NULL;
@@ -2360,6 +2419,8 @@ static int geth_probe(struct platform_device *pdev)
 	}
 #ifdef CONFIG_RTL8363_NB
 	rtl8363nb_vb_init();
+#elif defined CONFIG_JL51XX
+	jl51xx_vb_init();
 #endif
 
 	/* setup the netdevice, fill the field of netdevice */

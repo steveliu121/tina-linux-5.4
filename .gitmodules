@@ -1,0 +1,3 @@
+[submodule "drivers/net/phy/jlswitch/libswitch"]
+	path = drivers/net/phy/jlswitch/libswitch
+	url = ssh://git@dev.jlsemi.cn:2200/sw/jl_switch_sdk.git
