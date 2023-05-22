@@ -12,9 +12,6 @@ include $(SCRIPT_DIR)/Makefile.conf
 
 ccflags-$(CONFIG_JL51XX) += -DMDC_MDIO_OPERATION
 ccflags-$(CONFIG_JL51XX) += -I$(INC_DIR)/
-ccflags-$(CONFIG_JL51XX) += -I$(INC_DIR)/driver/
-ccflags-$(CONFIG_JL51XX) += -I$(INC_DIR)/jl51xx/
-ccflags-$(CONFIG_JL51XX) += -I$(INC_DIR)/portable/
 
 ccflags-$(CONFIG_JL51XX) += $(CFLAGS)
 
@@ -53,9 +50,10 @@ CONFIG_MODULE_NAME = 51xx
 	$(SRC_DIR)/jl51xx/jl51xx_drv_switch.o \
 	$(SRC_DIR)/jl51xx/jl51xx_drv_vlan.o \
 	$(SRC_DIR)/jl51xx/jl51xx_mac_uctrl.o \
-	$(SRC_DIR)/portable/demo_kernel_osdep.o \
-	$(SRC_DIR)/portable/demo_kernel_mdio.o
-	
+	portable/demo_kernel_osdep.o \
+	portable/demo_kernel_mdio.o \
+	test/jl_test_proc.o
+
 $(CONFIG_MODULE_NAME)-y := $(51xx-y)
 obj-$(CONFIG_JL51XX) += $(CONFIG_MODULE_NAME).o
 

@@ -50,6 +50,8 @@
 #include "jl_base.h"
 #include "port.h"
 #include "mib.h"
+extern int jl_proc_init(void);
+extern void jl_proc_exit(void);
 #endif
 
 #define SUNXI_GMAC_VERSION "1.0.0"
@@ -767,6 +769,8 @@ static int rtk_phy_write(struct mii_bus *bus, int phyaddr,
 static int jl51xx_vb_init(void)
 {
 	jl_port_ext_mac_ability_t ability;
+	jl_port_mac_ability_t cur_ability;
+	jl_api_ret_t ret = 0;
 
 	pr_info("%s->%d jl51xx init=====\n", __func__, __LINE__);
 
@@ -775,40 +779,110 @@ static int jl51xx_vb_init(void)
 		return -1;
 	}
 
-	/* Force the MAC of EXT_PORT 1 working with 100F */
+	/* Force the MAC of EXT_PORT0 working with 100F */
 	/* and Symmetric PAUSE flow control abilities */
 	memset(&ability, 0x00, sizeof(jl_port_ext_mac_ability_t));
-	jl_port_mac_force_link_ext_get(EXT_PORT0, &ability);
+	ret = jl_port_mac_force_link_ext_get(EXT_PORT0, &ability);
+#if 0
+	if (ret) {
+		pr_info("jl_port_mac_force_link_ext_get EXT_PORT error[%d]\n", ret);
+	} else {
+		pr_info("jl_port_mac_force_link_ext_get EXT_PORT success[%d]\n", ret);
+		pr_info("ability force mode : %d\n", ability.force_mode);
+		pr_info("ability speed : %d\n", ability.speed);
+		pr_info("ability duplex : %d\n", ability.duplex);
+		pr_info("ability linkstatus : %d\n", ability.link);
+		pr_info("ability tx_pause : %d\n", ability.tx_pause);
+		pr_info("ability rx_pause : %d\n", ability.rx_pause);
+	}
+#endif
 	ability.force_mode = 1;
-	ability.speed = 1;
-	ability.duplex = 1;
-	ability.link = 1;
+	ability.speed = PORT_SPEED_100M;
+	ability.duplex = PORT_FULL_DUPLEX;
+	ability.link = PORT_LINKUP;
 	ability.tx_pause = 1;
 	ability.rx_pause = 1;
-	jl_port_mac_force_link_ext_set(EXT_PORT0, &ability);
+	ret = jl_port_mac_force_link_ext_set(EXT_PORT0, &ability);
+#if 1
+	if (ret)
+		pr_info("jl_port_mac_force_link_ext_set EXT_PORT error[%d]\n", ret);
+	else
+		pr_info("jl_port_mac_force_link_ext_set EXT_PORT success[%d]\n", ret);
 
-	jl_port_phy_all_enable_set(ENABLED);
+	/* Get MAC ability of EXT_PORT0 */
+	memset(&ability, 0x00, sizeof(jl_port_ext_mac_ability_t));
+	ret = jl_port_mac_force_link_ext_get(EXT_PORT0, &ability);
+	if (ret) {
+		pr_info("jl_port_mac_force_link_ext_get EXT_PORT error[%d]\n", ret);
+	} else {
+		pr_info("jl_port_mac_force_link_ext_get EXT_PORT success[%d]\n", ret);
+		pr_info("ability force mode : %d\n", ability.force_mode);
+		pr_info("ability speed : %d\n", ability.speed);
+		pr_info("ability duplex : %d\n", ability.duplex);
+		pr_info("ability linkstatus : %d\n", ability.link);
+		pr_info("ability tx_pause : %d\n", ability.tx_pause);
+		pr_info("ability rx_pause : %d\n", ability.rx_pause);
+	}
+
+	/* Get MAC link status of EXT_PORT0 */
+	memset(&cur_ability, 0x00, sizeof(jl_port_mac_ability_t));
+	ret = jl_port_mac_status_get(EXT_PORT0, &cur_ability);
+	if (ret) {
+		pr_info("jl_port_mac_status_get EXT_PORT error[%d]\n", ret);
+	} else {
+		pr_info("jl_port_mac_status_get EXT_PORT success[%d]\n", ret);
+		pr_info("macability force mode : %d\n", cur_ability.force_mode);
+		pr_info("macability speed : %d\n", cur_ability.speed);
+		pr_info("macability duplex : %d\n", cur_ability.duplex);
+		pr_info("macability linkstatus : %d\n", cur_ability.link);
+		pr_info("macability force_fc_en : %d\n", cur_ability.force_fc_en);
+		pr_info("macability tx_pause : %d\n", cur_ability.tx_pause);
+		pr_info("macability rx_pause : %d\n", cur_ability.rx_pause);
+	}
+#endif
+//	jl_port_phy_all_enable_set(ENABLED);
+
 	return 0;
 }
 
 /* jl51xx switch mdc/mdio interface operations */
-int jl_mdio_read(u32 len, u8 phy_adr, u8 reg, u32 *value)
+u16 jl_mdio_read(u8 phy_adr, u8 reg)
 {
-
 	struct geth_priv *priv = netdev_priv(ndev);
-	*value = sunxi_mdio_read(priv->base, 0, reg);
-
-	return 0;
+	return sunxi_mdio_read(priv->base, 0, reg);
 }
 
-int jl_mdio_write(u32 len, u8 phy_adr, u8 reg, u32 data)
+int jl_mdio_write(u8 phy_adr, u8 reg, u16 data)
 {
-
 	struct geth_priv *priv = netdev_priv(ndev);
 	sunxi_mdio_write(priv->base, 0, reg, data);
 
 	return 0;
 }
+#if 0
+/* jl51xx switch PHY interface operations */
+static int jl_phy_read(struct mii_bus *bus, int phyaddr, int phyreg)
+{
+	struct net_device *ndev = bus->priv;
+	struct geth_priv *priv = netdev_priv(ndev);
+	u32 data = 0;
+
+	jl_apb_reg_read(phyreg, &data);
+
+	return data;
+}
+
+static int jl_phy_write(struct mii_bus *bus, int phyaddr,
+			   int phyreg, u16 data)
+{
+	struct net_device *ndev = bus->priv;
+	struct geth_priv *priv = netdev_priv(ndev);
+
+	jl_apb_reg_write(phyreg, data);
+
+	return 0;
+}
+#endif
 #endif
 
 /* PHY interface operations */
@@ -848,11 +922,17 @@ static void geth_adjust_link(struct net_device *ndev)
 		return;
 
 	spin_lock_irqsave(&priv->lock, flags);
-#if (defined CONFIG_RTL8363_NB) || (defined CONFIG_JL51XX)
+#ifdef CONFIG_RTL8363_NB
 	priv->speed = 1000;
 	priv->duplex = 1;
 	sunxi_set_link_mode(priv->base, 1, 1000);
 	phy_print_status(phydev);
+#elif defined CONFIG_JL51XX
+	priv->speed = 100;
+	priv->duplex = 1;
+	sunxi_set_link_mode(priv->base, 1, 100);
+	phy_print_status(phydev);
+	printk("temp for debug\n");
 #else
 	int new_state = 0;
 	if (phydev->link) {
@@ -944,6 +1024,9 @@ static int geth_phy_init(struct net_device *ndev)
 	pr_info("%s->%d =====> reg 0x1b00 = %x!\n", __func__, __LINE__, \
 			sunxi_mdio_read(priv->base, priv->phy_addr, 25));
 #endif
+//#elif defined CONFIG_JL51XX
+//	new_bus->read = &jl_phy_read;
+//	new_bus->write = &jl_phy_write;
 #else
 	new_bus->read = &geth_mdio_read;
 	new_bus->write = &geth_mdio_write;
@@ -1571,6 +1654,11 @@ static int geth_open(struct net_device *ndev)
 		}
 	}
 
+#ifdef CONFIG_JL51XX
+	jl51xx_vb_init();
+//	jl_proc_init();
+#endif
+
 	ret = sunxi_mac_reset((void *)priv->base, &sunxi_udelay, 10000);
 #if 0
 	if (ret) {
@@ -1644,6 +1732,11 @@ static int geth_stop(struct net_device *ndev)
 
 	/* Release PHY resources */
 	geth_phy_release(ndev);
+
+#ifdef CONFIG_JL51XX
+	jl_switch_deinit();
+//	jl_proc_exit();
+#endif
 
 	/* Disable Rx/Tx */
 	sunxi_mac_disable(priv->base);
@@ -2420,7 +2513,8 @@ static int geth_probe(struct platform_device *pdev)
 #ifdef CONFIG_RTL8363_NB
 	rtl8363nb_vb_init();
 #elif defined CONFIG_JL51XX
-	jl51xx_vb_init();
+//	jl51xx_vb_init();
+	jl_proc_init();
 #endif
 
 	/* setup the netdevice, fill the field of netdevice */
