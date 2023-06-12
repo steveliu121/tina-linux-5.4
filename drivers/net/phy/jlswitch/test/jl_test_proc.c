@@ -7,65 +7,12 @@
 #include "driver/jl_reg_io.h"
 
 #define BUFSIZE	100
-#define VERSION "v0.1"
+#define VERSION "v1.0"
 
 static int proc_debug_open(struct inode *inode, struct file *file)
 {
     return 0;
 }
-
-#if 0
-static int proc_reg_read(void)
-{
-	jl_api_ret_t ret;
-	uint32_t buf[8] = {0};
-	uint32_t register_addr = 0x200000;
-	uint8_t size = 2, i = 0;
-
-	ret = jl_reg_io_init();
-	if (ret) {
-		printk("smi init fail\n");
-		return -1;
-	}
-	ret = jl_apb_reg_burst_read(register_addr, &buf[0], size);
-	if (ret) {
-		printk("####error[%d]int func[%s] line[%d]\n", ret, __func__, __LINE__);
-		goto exit;
-	}
-	
-	printk("read register[0x%08x]\n", register_addr);
-	for (i = 0; i < size; i++)
-		printk("\t0x%08x", buf[i]);
-
-exit:
-	printk("\n");
-	jl_reg_io_deinit();
-	return 0;
-}
-
-static int proc_reg_write(void)
-{
-	jl_api_ret_t ret;
-	uint32_t buf[8] = {0x10222345,0x2087};
-	uint32_t register_addr = 0x200000;
-	uint8_t size = 2;
-
-	ret = jl_reg_io_init();
-	if (ret) {
-		printk("smi init fail\n");
-		return -1;
-	}
-	ret = jl_apb_reg_burst_write(register_addr, &buf[0], size);
-	if (ret) {
-		printk("####error[%d]int func[%s] line[%d]\n", ret, __func__, __LINE__);
-		goto exit;
-	}
-
-exit:
-	jl_reg_io_deinit();
-	return 0;
-}
-#endif
 
 static void print_usage(void)
 {
@@ -103,7 +50,6 @@ static int proc_parse_cmd(char *str)
 	unsigned long val = 0;
 
 	while(token = strsep(&str, delim)) {
-		printk("%s", token);
 		if(token[0] != '-' || token[1] == 0) {
 			printk("invalid param\n");
 			print_usage();
@@ -147,7 +93,7 @@ static int proc_parse_cmd(char *str)
 		/* write */
 		str0 = value_str;
 		str1 = strstr(str0, ",");
-		int i = 0;
+		i = 0;
 	
 		if (str1 == NULL) {
 			kstrtoul(str0, 16, &val);
@@ -222,7 +168,7 @@ static struct file_operations proc_debug_fops = {
 
 int jl_proc_init(void)
 {
-	printk("%s, version %s\n", __func__, VERSION);
+	pr_info("[%s]: version %s\n", __func__, VERSION);
 	test_dir = proc_mkdir("test", NULL);
     if(!test_dir) {
         return -ENOMEM;
@@ -238,7 +184,6 @@ int jl_proc_init(void)
 
 void jl_proc_exit(void)
 {
-	printk("%s\n", __func__);
 	remove_proc_entry("debug", test_dir);
 	remove_proc_entry("test", NULL);
 }
