@@ -10,9 +10,7 @@ UC = $(shell echo '$1' | tr '[:lower:]' '[:upper:]')
 include .config
 include $(SCRIPT_DIR)/Makefile.conf
 
-ccflags-$(CONFIG_JL51XX) += -DMDC_MDIO_OPERATION
 ccflags-$(CONFIG_JL51XX) += -I$(INC_DIR)/
-
 ccflags-$(CONFIG_JL51XX) += $(CFLAGS)
 
 CONFIG_MODULE_NAME = 51xx
@@ -52,7 +50,7 @@ CONFIG_MODULE_NAME = 51xx
 	$(SRC_DIR)/jl51xx/jl51xx_mac_uctrl.o \
 	portable/demo_kernel_osdep.o \
 	portable/demo_kernel_mdio.o \
-	test/jl_test_proc.o
+	devswitch/jl_switch_dev.o
 
 $(CONFIG_MODULE_NAME)-y := $(51xx-y)
 obj-$(CONFIG_JL51XX) += $(CONFIG_MODULE_NAME).o

@@ -46,11 +46,10 @@
 #include <rtk_switch.h>
 #include <rtk_error.h>
 #include <rtl8367c_asicdrv_port.h>
-#elif defined CONFIG_JL51XX
-#include "jl_base.h"
-#include "port.h"
-extern int jl_proc_init(void);
-extern void jl_proc_exit(void);
+#endif
+
+#ifdef CONFIG_JLSWITCH
+#include "jl_switch_dev.h"
 #endif
 
 #define SUNXI_GMAC_VERSION "1.0.0"
@@ -182,10 +181,6 @@ rtk_stat_counter_t cntr;
 rtk_mode_ext_t mode;
 struct net_device *ndev = NULL;
 struct geth_priv *priv;
-#endif
-
-#ifdef CONFIG_JL51XX
-void __iomem *mdio_base;
 #endif
 
 static u64 geth_dma_mask = DMA_BIT_MASK(32);
@@ -761,60 +756,6 @@ static int rtk_phy_write(struct mii_bus *bus, int phyaddr,
 	smi_write(phyreg, data);
 
 	return 0;
-}
-#endif
-
-#ifdef CONFIG_JL51XX
-static jl_api_ret_t jl51xx_init(struct net_device *ndev)
-{
-	struct geth_priv *priv = netdev_priv(ndev);
-	jl_port_ext_mac_ability_t ability;
-	jl_port_mac_ability_t status;
-	jl_api_ret_t ret = 0;
-
-	pr_info("[%s]: interface is %s\n", __func__, phy_modes(priv->phy_interface));
-
-	mdio_base = priv->base;
-
-	ret = jl_switch_init();
-	if (ret) {
-		pr_err("[%s]: jlsemi switch init failed!\n", __func__);
-		return ret;
-	}
-
-	/* Force the MAC of EXT_PORT0 working with 100F */
-	/* and Symmetric PAUSE flow control abilities */
-	memset(&ability, 0x00, sizeof(jl_port_ext_mac_ability_t));
-	//ability.force_mode = 1;
-	ability.speed = PORT_SPEED_100M;
-	ability.duplex = PORT_FULL_DUPLEX;
-	ability.link = PORT_LINKUP;
-	ability.tx_pause = 1;
-	ability.rx_pause = 1;
-	ret = jl_port_mac_force_link_ext_set(EXT_PORT0, &ability);
-	if (ret) {
-		pr_err("[%s]: jl_port_mac_force_link_ext_set EXT_PORT0 error[%d]\n", __func__, ret);
-		return ret;
-	}
-
-	/* Get MAC link status of EXT_PORT0 */
-	memset(&status, 0x00, sizeof(jl_port_mac_ability_t));
-	ret = jl_port_mac_status_get(EXT_PORT0, &status);
-	if (ret) {
-		pr_err("[%s]: jl_port_mac_status_get EXT_PORT0 error[%d]\n", __func__, ret);
-		netif_carrier_off(ndev);
-	} else if (status.link == 1) {
-		pr_info("[%s]: link Up\n", __func__);
-		netif_carrier_on(ndev);
-	} else {
-		pr_info("[%s]: link Down\n", __func__);
-		netif_carrier_off(ndev);
-	}
-
-	priv->speed = (ability.speed == PORT_SPEED_100M)? 100 : 10;
-	priv->duplex = ability.duplex;
-
-	return JL_ERR_OK;
 }
 #endif
 
@@ -1548,6 +1489,20 @@ static irqreturn_t geth_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_JLSWITCH
+static void __iomem *mdio_base;
+
+void sunxi_jl_mdio_write(int phy, int reg, unsigned short val)
+{
+	sunxi_mdio_write(mdio_base, 0, reg, val);
+}
+
+int sunxi_jl_mdio_read(int phy, int reg)
+{
+	return sunxi_mdio_read(mdio_base, 0, reg);
+}
+#endif
+
 static int geth_open(struct net_device *ndev)
 {
 	struct geth_priv *priv = netdev_priv(ndev);
@@ -1567,11 +1522,16 @@ static int geth_open(struct net_device *ndev)
 
 	netif_carrier_off(ndev);
 
-#ifdef CONFIG_JL51XX
-	jl_proc_init();
-	ret = jl51xx_init(ndev);
+#ifdef CONFIG_JLSWITCH
+	pr_info("[%s]: interface is %s\n", __func__, phy_modes(priv->phy_interface));
+
+	mdio_base = priv->base;
+	priv->speed = 100;
+	priv->duplex = 1;
+
+	ret = jl_switch_open(ndev, priv->duplex, priv->speed);
 	if (ret) {
-		pr_err("[%s]: jlsemi switch init failed\n", __func__);
+		pr_err("[%s]: jlsemi switch open failed\n", __func__);
 		ret = -EINVAL;
 		goto err;
 	}
@@ -1620,12 +1580,11 @@ static int geth_open(struct net_device *ndev)
 	/* Extra statistics */
 	memset(&priv->xstats, 0, sizeof(struct geth_extra_stats));
 
-#ifdef CONFIG_JL51XX
+#ifdef CONFIG_JLSWITCH
 	sunxi_set_link_mode(priv->base, priv->duplex, priv->speed);
-#else
+#endif
 	if (ndev->phydev)
 		phy_start(ndev->phydev);
-#endif
 
 	sunxi_start_rx(priv->base, (unsigned long)((struct dma_desc *)
 		       priv->dma_rx_phy + priv->rx_dirty));
@@ -1641,9 +1600,7 @@ static int geth_open(struct net_device *ndev)
 	return 0;
 
 desc_err:
-#ifndef CONFIG_JL51XX
 	geth_phy_release(ndev);
-#endif
 err:
 	geth_clk_disable(priv);
 	if (priv->is_suspend)
@@ -1663,13 +1620,11 @@ static int geth_stop(struct net_device *ndev)
 
 	netif_carrier_off(ndev);
 
-#ifdef CONFIG_JL51XX
-	jl_proc_exit();
-	jl_switch_deinit();
-#else
+#ifdef CONFIG_JLSWITCH
+	jl_switch_stop();
+#endif
 	/* Release PHY resources */
 	geth_phy_release(ndev);
-#endif
 
 	/* Disable Rx/Tx */
 	sunxi_mac_disable(priv->base);
