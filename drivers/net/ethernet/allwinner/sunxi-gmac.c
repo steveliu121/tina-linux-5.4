@@ -1529,7 +1529,7 @@ static int geth_open(struct net_device *ndev)
 	priv->speed = 100;
 	priv->duplex = 1;
 
-	ret = jl_switch_open(ndev, priv->duplex, priv->speed);
+	ret = jl_switch_open(ndev, priv->duplex, priv->speed, JL_MODE_RMII);
 	if (ret) {
 		pr_err("[%s]: jlsemi switch open failed\n", __func__);
 		ret = -EINVAL;

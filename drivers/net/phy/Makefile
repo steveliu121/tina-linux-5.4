@@ -92,6 +92,7 @@ obj-$(CONFIG_RENESAS_PHY)	+= uPD60620.o
 obj-$(CONFIG_ROCKCHIP_PHY)	+= rockchip.o
 obj-$(CONFIG_RTL8363_NB)	+= rtl8363_nb/
 obj-$(CONFIG_JL51XX)		+= jlswitch/
+obj-$(CONFIG_JL61XX)		+= jlswitch/
 obj-$(CONFIG_SMSC_PHY)		+= smsc.o
 obj-$(CONFIG_STE10XP)		+= ste10Xp.o
 obj-$(CONFIG_TERANETICS_PHY)	+= teranetics.o

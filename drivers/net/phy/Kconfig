@@ -478,6 +478,11 @@ config JL51XX
 	---help---
 	  This is a driver for the JL51xx Fast Ethernet switch
 
+config JL61XX
+	tristate "JLSemi JL61xx Ethernet Adapter support"
+	---help---
+	  This is a driver for the JL61xx Fast Ethernet switch
+
 config SMSC_PHY
 	tristate "SMSC PHYs"
 	---help---

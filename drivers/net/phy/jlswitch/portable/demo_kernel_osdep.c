@@ -1,4 +1,5 @@
 #include <linux/delay.h>
+#include <linux/slab.h>
 
 #include "jl_types.h"
 
@@ -32,3 +33,14 @@ void port_udelay(jl_uint32 us)
 {
 	udelay(us);
 }
+
+void *port_mem_malloc(jl_uint32 size)
+{
+	return kmalloc(size, GFP_KERNEL);
+}
+
+void port_mem_free(void *ptr)
+{
+	kfree(ptr);
+}
+

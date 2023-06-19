@@ -1,3 +1,16 @@
+/*
+ * Copyright (c) 2014-2023 JLSemi Limited
+ * All Rights Reserved
+ *
+ * THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE of JLSemi Limited
+ * The copyright notice above does not evidence any actual or intended
+ * publication of such source code.
+ *
+ * No part of this code may be reproduced, stored in a retrieval system,
+ * or transmitted, in any form or by any means, electronic, mechanical,
+ * photocopying, recording, or otherwise, without the prior written
+ * permission of JLSemi Limited
+ */
 #include <linux/phy.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -6,9 +19,14 @@
 #include <linux/netdevice.h>
 
 #include "driver/jl_reg_io.h"
-
 #include "jl_base.h"
+#include "jl_switch_dev.h"
+#ifdef CONFIG_JL51XX
 #include "port.h"
+#else
+#include "jl_switch.h"
+#include "jl_port.h"
+#endif
 
 #define BUFSIZE	100
 #define VERSION "v1.0"
@@ -52,6 +70,13 @@ static int proc_parse_cmd(char *str)
 	int i = 0;
 	jl_api_ret_t ret;
 	unsigned long val = 0;
+#ifndef CONFIG_JL51XX
+	jl_io_desc_t io_desc = {
+		.chip = JL_CHIP_61XX,
+		.type = JL_IO_SMI,
+		.smi.mdio.bus_id = 0
+	};
+#endif
 
 	while(token = strsep(&str, delim)) {
 		if(token[0] != '-' || token[1] == 0) {
@@ -87,7 +112,11 @@ static int proc_parse_cmd(char *str)
 		}
 	}
 
+#ifdef CONFIG_JL51XX
 	ret = jl_reg_io_init();
+#else
+	ret = jl_reg_io_init(&io_desc);
+#endif
 	if (ret) {
 		printk("io init fail\n");
 		return -1;
@@ -122,14 +151,22 @@ static int proc_parse_cmd(char *str)
 			}
 		}
 
+#ifdef CONFIG_JL51XX
 		ret = jl_apb_reg_burst_write(register_addr, &buf[0], size);
+#else
+		ret = jl_reg_burst_write(&io_desc, register_addr, &buf[0], size);
+#endif
 		if (ret) {
 			printk("####error[%d]int func[%s] line[%d]\n", ret, __func__, __LINE__);
 			goto exit;
 		}
 	} else {
 		/* read */
+#ifdef CONFIG_JL51XX
 		ret = jl_apb_reg_burst_read(register_addr, &buf[0], size);
+#else
+		ret = jl_reg_burst_read(&io_desc, register_addr, &buf[0], size);
+#endif
 		if (ret) {
 			printk("####error[%d]int func[%s] line[%d]\n", ret, __func__, __LINE__);
 			goto exit;
@@ -142,8 +179,11 @@ static int proc_parse_cmd(char *str)
 
 exit:
 	printk("\n");
+#ifdef CONFIG_JL51XX
 	jl_reg_io_deinit();
-
+#else
+	jl_reg_io_deinit(&io_desc);
+#endif
 	return 0;
 }
 
@@ -190,40 +230,25 @@ static void jl_proc_exit(void)
 	remove_proc_entry(PROC_DIR, NULL);
 }
 
-/**
- * jl_switch_open - initialize jlsemi switch mac.
- * @ndev: net device.
- * @duplex: duplex mode, 0: half-duplex, 1: full-duplex.
- * @speed: mac working speed, eg: 10, 100, 1000.
- *
- * return 0 if success, otherwise failed.
- */
-int jl_switch_open(struct net_device *ndev, int duplex, int speed)
+#ifdef CONFIG_JL51XX
+static int jl51xx_open(struct net_device *ndev, int duplex, int speed)
 {
 	jl_port_ext_mac_ability_t ability;
 	jl_port_mac_ability_t status;
-	jl_api_ret_t ret = 0;
+	jl_api_ret_t ret = JL_ERR_OK;
 
 	ret = jl_proc_init();
-	if (ret) {
-		pr_err("[%s]: jlsemi proc init failed!\n", __func__);
-		return ret;
-	}
+	if (ret)
+		goto exit;
 
 	ret = jl_switch_init();
-	if (ret) {
-		pr_err("[%s]: jlsemi switch init failed!\n", __func__);
-		return ret;
-	}
+	if (ret)
+		goto exit;
 
-	/* Force the MAC of EXT_PORT0 working with 100F */
-	/* and Symmetric PAUSE flow control abilities */
 	memset(&ability, 0x00, sizeof(jl_port_ext_mac_ability_t));
 	//ability.force_mode = 1;
 	if (speed == 100)
 		ability.speed = PORT_SPEED_100M;
-//	else if (speed == 1000)
-//		ability.speed = PORT_SPEED_1000M;
 	else
 		ability.speed = PORT_SPEED_10M;
 	ability.duplex = duplex;
@@ -231,18 +256,15 @@ int jl_switch_open(struct net_device *ndev, int duplex, int speed)
 	ability.tx_pause = 1;
 	ability.rx_pause = 1;
 	ret = jl_port_mac_force_link_ext_set(EXT_PORT0, &ability);
-	if (ret) {
-		pr_err("[%s]: jl_port_mac_force_link_ext_set EXT_PORT0 error[%d]\n", __func__, ret);
-		return ret;
-	}
+	if (ret)
+		goto exit;
 
 	/* Get MAC link status of EXT_PORT0 */
 	memset(&status, 0x00, sizeof(jl_port_mac_ability_t));
 	ret = jl_port_mac_status_get(EXT_PORT0, &status);
-	if (ret) {
-		pr_err("[%s]: jl_port_mac_status_get EXT_PORT0 error[%d]\n", __func__, ret);
-		netif_carrier_off(ndev);
-	} else if (status.link == 1) {
+
+exit:
+	if (ret == JL_ERR_OK && status.link == 1) {
 		pr_info("[%s]: link Up\n", __func__);
 		netif_carrier_on(ndev);
 	} else {
@@ -250,7 +272,111 @@ int jl_switch_open(struct net_device *ndev, int duplex, int speed)
 		netif_carrier_off(ndev);
 	}
 
-	return JL_ERR_OK;
+	return ret;
+}
+#else
+static jl_chip_name_t compat_id[] = {JL_CHIP_6108, JL_CHIP_6110, JL_CHIP_6105,
+									 JL_CHIP_6107, JL_CHIP_6107S,JL_CHIP_6107SC};
+static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t mode)
+{
+	jl_port_mac_ability_t ability, status;
+	jl_mode_ext_t ext_mode = MODE_EXT_RGMII;
+	int i = 0;
+	jl_api_ret_t ret = 0;
+	jl_uint32 chip_id = 0;
+	jl_dev_t dev_61xx = {
+		.compat_id = JL_CHIP_6108,
+		.name = "device-jl61xx",
+		.id = chip_id, /* must be less than JL_MAX_CHIP_NUM */
+		.io = {
+			.chip = JL_CHIP_61XX,
+			.type = JL_IO_SMI,
+			.smi.mdio.bus_id = 0
+		}
+	};
+
+	ret = jl_proc_init();
+	if (ret)
+		goto exit;
+
+	ret = jl_switch_init();
+	if (ret)
+		goto exit;
+
+	for (i = 0; i < (int)(sizeof(compat_id)/sizeof(jl_chip_name_t)); i++) {
+		dev_61xx.compat_id = compat_id[i];
+		ret = jl_switch_device_create(&dev_61xx);
+		if (ret == JL_ERR_OK) {
+			pr_info("[%s]: jlsemi device compat_id = 0x%x!\n", __func__, compat_id[i]);
+			break;
+		}
+	}
+	if (ret) {
+		pr_err("[%s]: jlsemi device create failed!\n", __func__);
+		goto exit;
+	}
+
+	switch (mode) {
+	case JL_MODE_MII:
+		ext_mode = MODE_EXT_MII_PHY;
+		break;
+	case JL_MODE_RMII:
+		ext_mode = MODE_EXT_RMII_PHY;
+		break;
+	case JL_MODE_RGMII:
+		ext_mode = MODE_EXT_RGMII;
+		break;
+	case JL_MODE_SGMII:
+		ext_mode = MODE_EXT_SGMII_PHY;
+		break;
+	case JL_MODE_HSGMII:
+		ext_mode = MODE_EXT_HSGMII;
+		break;
+	default:
+		pr_err("[%s]: jlsemi unknown mode!\n", __func__);
+		goto exit;
+	}
+
+	memset(&ability, 0x00, sizeof(jl_port_mac_ability_t));
+	ability.force_mode = 1;
+	if (speed == 1000)
+		ability.speed = PORT_SPEED_1000M;
+	else if (speed == 100)
+		ability.speed = PORT_SPEED_100M;
+	else
+		ability.speed = PORT_SPEED_10M;
+	ability.duplex = duplex;
+	ability.link = PORT_LINKUP;
+	ability.tx_pause = 1;
+	ability.rx_pause = 1;
+	ret = jl_port_mac_force_link_ext_set(chip_id, EXT_PORT0, ext_mode, &ability);
+	if (ret)
+		goto exit;
+
+	/* Get MAC status of EXT_PORT0 */
+	memset(&status, 0x00, sizeof(jl_port_mac_ability_t));
+	ret = jl_port_mac_status_get(chip_id, EXT_PORT0, &status);
+
+exit:
+	if (ret == JL_ERR_OK && status.link == 1) {
+		pr_info("[%s]: link Up\n", __func__);
+		netif_carrier_on(ndev);
+	} else {
+		pr_info("[%s]: link Down\n", __func__);
+		netif_carrier_off(ndev);
+	}
+
+	return ret;
+}
+#endif
+
+int jl_switch_open(struct net_device *ndev, int duplex, int speed, jl_mode_t mode)
+{
+#ifdef CONFIG_JL51XX
+	return jl51xx_open(ndev, duplex, speed);
+#else
+	return jl61xx_open(ndev, duplex, speed, mode);
+#endif
 }
 
 int jl_switch_stop(void)
