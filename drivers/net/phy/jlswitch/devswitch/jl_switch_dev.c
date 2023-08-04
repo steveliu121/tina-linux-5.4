@@ -208,6 +208,7 @@ static struct file_operations proc_debug_fops = {
 
 static int jl_proc_init(void)
 {
+#if 0
 	pr_info("[%s]: version %s\n", __func__, VERSION);
 	proc_dir = proc_mkdir(PROC_DIR, NULL);
     if(!proc_dir) {
@@ -217,17 +218,20 @@ static int jl_proc_init(void)
 
 	proc_file = proc_create(PROC_FILE, 0666, proc_dir, &proc_debug_fops);
 	if(!proc_file) {
+		remove_proc_entry(PROC_DIR, NULL);
 		pr_err("[%s]: proc_create %s failed!\n", __func__, PROC_FILE);
 		return -ENOMEM;
 	}
-
+#endif
 	return JL_ERR_OK;
 }
 
 static void jl_proc_exit(void)
 {
+#if 0
 	remove_proc_entry(PROC_FILE, proc_dir);
 	remove_proc_entry(PROC_DIR, NULL);
+#endif
 }
 
 #ifdef CONFIG_JL51XX
@@ -285,11 +289,10 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 	jl_api_ret_t ret = 0;
 	jl_uint32 chip_id = 0;
 	jl_dev_t dev_61xx = {
-		.compat_id = JL_CHIP_6108,
+		.compat_id = JL_CHIP_6110,
 		.name = "device-jl61xx",
 		.id = chip_id, /* must be less than JL_MAX_CHIP_NUM */
 		.io = {
-			.chip = JL_CHIP_61XX,
 			.type = JL_IO_SMI,
 			.smi.mdio.bus_id = 0
 		}
@@ -311,6 +314,7 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 			break;
 		}
 	}
+
 	if (ret) {
 		pr_err("[%s]: jlsemi device create failed!\n", __func__);
 		goto exit;

@@ -13,6 +13,7 @@
  */
 #ifndef __JL_SWITCH_DEV_H__
 #define __JL_SWITCH_DEV_H__
+#include <linux/netdevice.h>
 
 typedef enum {
 	JL_MODE_MII,

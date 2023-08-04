@@ -13,6 +13,9 @@ SRC_DIRS += $(DRV_DIRS)
 SRC_FILES := $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
 SRC_FILES += $(DRIVER_DIR)/smi/hal_jl61xx_smi.c
 SRC_FILES += $(DRIVER_DIR)/smi/hal_smi_mdio.c
+SRC_FILES += $(DRIVER_DIR)/smi/hal_smi_spi.c
+SRC_FILES += $(DRIVER_DIR)/spi/hal_spi.c
+SRC_FILES += $(DRIVER_DIR)/spi/hal_jl61xx_spi.c
 SRC_FILES += $(DRIVER_DIR)/jl_reg_ida.c
 SRC_FILES += $(DRIVER_DIR)/jl_reg_io.c
 
@@ -28,6 +31,8 @@ CONFIG_MODULE_NAME = 61xx
 	$(OBJ_FILES) \
 	portable/demo_kernel_osdep.o \
 	portable/demo_kernel_mdio.o \
+	portable/demo_kernel_spi.o \
+	devswitch/jl_spi_dev.o	\
 	devswitch/jl_switch_dev.o
 
 $(CONFIG_MODULE_NAME)-y := $(61xx-y)
