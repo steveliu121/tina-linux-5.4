@@ -1,6 +1,5 @@
 #include "jl_types.h"
 #include "jl_error.h"
-#include "jl_device.h"
 
 extern void sunxi_jl_mdio_write(int phy, int reg, unsigned short val);
 extern int sunxi_jl_mdio_read(int phy, int reg);
@@ -27,6 +26,7 @@ jl_uint16 port_mdio_read(jl_uint8 phy, jl_uint8 reg)
 }
 
 #else
+#include "jl_device.h"
 
 jl_ret_t port_mdio_init(jl_io_desc_t *io_desc)
 {

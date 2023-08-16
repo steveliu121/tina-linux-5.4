@@ -279,8 +279,8 @@ exit:
 	return ret;
 }
 #else
-static jl_chip_name_t compat_id[] = {JL_CHIP_6108, JL_CHIP_6110, JL_CHIP_6105,
-									 JL_CHIP_6107, JL_CHIP_6107S,JL_CHIP_6107SC};
+static jl_chip_name_t compat_id[] = {JL_CHIP_6107S, JL_CHIP_6107SC, JL_CHIP_6107, 
+									JL_CHIP_6105, JL_CHIP_6108, JL_CHIP_6110};
 static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t mode)
 {
 	jl_port_mac_ability_t ability, status;
@@ -289,7 +289,7 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 	jl_api_ret_t ret = 0;
 	jl_uint32 chip_id = 0;
 	jl_dev_t dev_61xx = {
-		.compat_id = JL_CHIP_6110,
+		.compat_id = JL_CHIP_6107S,
 		.name = "device-jl61xx",
 		.id = chip_id, /* must be less than JL_MAX_CHIP_NUM */
 		.io = {
@@ -314,7 +314,6 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 			break;
 		}
 	}
-
 	if (ret) {
 		pr_err("[%s]: jlsemi device create failed!\n", __func__);
 		goto exit;
@@ -360,6 +359,17 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 	/* Get MAC status of EXT_PORT0 */
 	memset(&status, 0x00, sizeof(jl_port_mac_ability_t));
 	ret = jl_port_mac_status_get(chip_id, EXT_PORT0, &status);
+	if (ret) {
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "jl_port_mac_status_get EXT_PORT0 error[%d]\n", ret);
+	} else {
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "jl_port_mac_status_get EXT_PORT0 success[%d]\n", ret);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability force mode : %d\n", status.force_mode);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability speed : %d\n", status.speed);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability duplex : %d\n", status.duplex);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability linkstatus : %d\n", status.link);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability tx_pause : %d\n", status.tx_pause);
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "macability rx_pause : %d\n", status.rx_pause);
+	}
 
 exit:
 	if (ret == JL_ERR_OK && status.link == 1) {

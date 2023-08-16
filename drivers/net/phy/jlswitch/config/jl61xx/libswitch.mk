@@ -25,6 +25,7 @@ OBJ_FILES := $(patsubst $(src)%.c, %.o, $(SRC_FILES))
 
 ccflags-$(CONFIG_JL61XX) += -I$(INC_DIR)/
 ccflags-$(CONFIG_JL61XX) += $(CFLAGS)
+ccflags-$(CONFIG_JL61XX) += -std=gnu99
 
 CONFIG_MODULE_NAME = 61xx
 61xx-$(CONFIG_JL61XX) += \
