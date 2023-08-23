@@ -322,24 +322,30 @@ static int jl61xx_open(struct net_device *ndev, int duplex, int speed, jl_mode_t
 	switch (mode) {
 	case JL_MODE_MII:
 		ext_mode = MODE_EXT_MII_PHY;
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "phy mode: (%d) MODE_EXT_MII_PHY\n", ext_mode);
 		break;
 	case JL_MODE_RMII:
 		ext_mode = MODE_EXT_RMII_PHY;
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "phy mode: (%d) MODE_EXT_RMII_PHY\n", ext_mode);
 		break;
 	case JL_MODE_RGMII:
 		ext_mode = MODE_EXT_RGMII;
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "phy mode: (%d) MODE_EXT_RGMII\n", ext_mode);
 		break;
 	case JL_MODE_SGMII:
 		ext_mode = MODE_EXT_SGMII_PHY;
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "phy mode: (%d) MODE_EXT_SGMII_PHY\n", ext_mode);
 		break;
 	case JL_MODE_HSGMII:
 		ext_mode = MODE_EXT_HSGMII;
+		JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "phy mode: (%d) MODE_EXT_HSGMII\n", ext_mode);
 		break;
 	default:
 		pr_err("[%s]: jlsemi unknown mode!\n", __func__);
 		goto exit;
 	}
 
+	JL_DBG_MSG(JL_FLAG_SYS, _DBG_INFO, "speed: %dMbps\n", speed);
 	memset(&ability, 0x00, sizeof(jl_port_mac_ability_t));
 	ability.force_mode = 1;
 	if (speed == 1000)

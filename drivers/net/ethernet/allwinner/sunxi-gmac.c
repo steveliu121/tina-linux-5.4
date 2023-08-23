@@ -568,6 +568,37 @@ static ssize_t mii_write_store(struct device *dev,
 	if (ret)
 		return ret;
 
+	if((2 == reg) || (3 == reg)) {
+		u32 clk_value;
+		u8 tdelay;
+		u8 rdelay;
+
+		clk_value = readl(priv->base_phy);
+
+		tdelay = (clk_value >> 10) & 0x07;
+
+		rdelay = (clk_value >> 5) & 0x1f;
+
+		printk("gmac delay read  tx--> %x , rx--> %x \n", tdelay, rdelay);
+
+
+		if(2 == reg)
+		{
+			tdelay = (val & 0x07);
+		}
+		else
+		{
+			rdelay = (val & 0x1f);
+		}
+
+		printk("gmac delay write tx--> %x , rx--> %x \n", tdelay, rdelay);
+
+		clk_value &= ~((0x07 << 10)| (0x1F << 5));
+		clk_value |= ((tdelay << 10) | (rdelay << 5));
+
+		writel(clk_value, priv->base_phy);
+	}
+
 	priv->mii_reg.reg = reg;
 	priv->mii_reg.addr = addr;
 	priv->mii_reg.value = val;
@@ -1514,6 +1545,7 @@ static int geth_open(struct net_device *ndev)
 		ret = -EINVAL;
 	}
 
+	priv->phy_interface = PHY_INTERFACE_MODE_RGMII;
 	ret = geth_clk_enable(priv);
 	if (ret) {
 		pr_err("[%s]: clk enable is failed\n", __func__);
@@ -1523,13 +1555,29 @@ static int geth_open(struct net_device *ndev)
 	netif_carrier_off(ndev);
 
 #ifdef CONFIG_JLSWITCH
-	pr_info("[%s]: interface is %s\n", __func__, phy_modes(priv->phy_interface));
-
+	jl_mode_t mode = JL_MODE_RGMII;
 	mdio_base = priv->base;
 	priv->speed = 100;
 	priv->duplex = 1;
 
-	ret = jl_switch_open(ndev, priv->duplex, priv->speed, JL_MODE_RMII);
+	pr_info("[%s]: interface is %s, speed = %d\n", __func__, phy_modes(priv->phy_interface), priv->speed);
+
+	switch (priv->phy_interface) {
+	case PHY_INTERFACE_MODE_MII:
+		mode = JL_MODE_MII;
+		break;
+	case PHY_INTERFACE_MODE_RMII:
+		mode = JL_MODE_RMII;
+		break;
+	case PHY_INTERFACE_MODE_RGMII:
+		mode = JL_MODE_RGMII;
+		break;
+	default:
+		mode = JL_MODE_MII;
+		break;
+	}
+
+	ret = jl_switch_open(ndev, priv->duplex, priv->speed, mode);
 	if (ret) {
 		pr_err("[%s]: jlsemi switch open failed\n", __func__);
 		ret = -EINVAL;
