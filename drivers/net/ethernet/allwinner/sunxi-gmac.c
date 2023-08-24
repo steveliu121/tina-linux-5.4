@@ -1545,7 +1545,7 @@ static int geth_open(struct net_device *ndev)
 		ret = -EINVAL;
 	}
 
-	priv->phy_interface = PHY_INTERFACE_MODE_RGMII;
+//	priv->phy_interface = PHY_INTERFACE_MODE_RGMII;
 	ret = geth_clk_enable(priv);
 	if (ret) {
 		pr_err("[%s]: clk enable is failed\n", __func__);
